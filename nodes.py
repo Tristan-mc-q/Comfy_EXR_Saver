@@ -33,11 +33,10 @@ class SaveImageEXR_Deployable:
     RETURN_TYPES = ()
     FUNCTION = "save_exr_images"
     OUTPUT_NODE = True
-    CATEGORY = "Image/Deployable" # Let's put it in a custom category
+    CATEGORY = "Image/Deployable"
 
     def save_exr_images(self, images, filename_prefix="ComfyUI_EXR"):
         if not OPENCV_AVAILABLE:
-            # If opencv isn't installed, we can't proceed.
             raise ImportError("OpenCV is required to save EXR files with this node.")
 
         full_output_folder, filename, counter, subfolder, filename_prefix = folder_paths.get_save_image_path(filename_prefix, self.output_dir, images[0].shape[1], images[0].shape[0])
@@ -46,22 +45,15 @@ class SaveImageEXR_Deployable:
         for image in images:
             image_np = image.cpu().numpy()
 
-            # Ensure image is in float32 format, which is standard for HDR/EXR
             if image_np.dtype != np.float32:
                  image_np = image_np.astype(np.float32)
 
-            # Define the file path
             file = f"{filename}_{counter:05}.exr"
             file_path = os.path.join(full_output_folder, file)
-
-            # OpenCV expects BGR color order, but ComfyUI tensors are RGB.
-            # So we must convert the color channels before saving.
-            image_np_bgr = cv2.cvtColor(image_np, cv2.COLOR_RGB2BGR)
             
-            # Save the image using OpenCV
+            image_np_bgr = cv2.cvtColor(image_np, cv2.COLOR_RGB2BGR)
             cv2.imwrite(file_path, image_np_bgr)
 
-            # Append the result for the ComfyUI/ComfyDeploy backend
             results.append({
                 "filename": file,
                 "subfolder": subfolder,
@@ -69,5 +61,53 @@ class SaveImageEXR_Deployable:
             })
             counter += 1
 
-        # Return the data in the format ComfyDeploy expects
         return {"ui": {"images": results}}
+
+# --- NEW NODE ADDED BELOW ---
+
+class ExportFloat:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "value": ("FLOAT", {
+                    "default": 0.0,
+                    "min": -1e9,
+                    "max": 1e9,
+                    "step": 0.01,
+                    "round": 0.001,
+                    "display": "number"
+                }),
+                "output_name": ("STRING", {"default": "float_output"}),
+            }
+        }
+
+    RETURN_TYPES = ("FLOAT",)
+    RETURN_NAMES = ("value",)
+    FUNCTION = "export_value"
+
+    CATEGORY = "Image/Deployable" # Placing it in the same category
+
+    def export_value(self, value, output_name):
+        text_output = f"{output_name}: {value}"
+        
+        return {
+            "ui": {
+                "text": [text_output]
+            },
+            "result": (value,)
+        }
+
+# --- NODE REGISTRATION ADDED BELOW ---
+
+# This dictionary tells ComfyUI about the nodes in this file
+NODE_CLASS_MAPPINGS = {
+    "SaveImageEXR_Deployable": SaveImageEXR_Deployable,
+    "ExportFloat": ExportFloat
+}
+
+# This dictionary sets the display names of the nodes in the ComfyUI menu
+NODE_DISPLAY_NAME_MAPPINGS = {
+    "SaveImageEXR_Deployable": "Save EXR (Deployable)",
+    "ExportFloat": "Export Float"
+}
