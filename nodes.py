@@ -30,7 +30,9 @@ class SaveImageEXR_Deployable:
             }
         }
     
-    RETURN_TYPES = ()
+    # MODIFIED: Added a STRING output for the file path
+    RETURN_TYPES = ("STRING",)
+    RETURN_NAMES = ("file_path",)
     FUNCTION = "save_exr_images"
     OUTPUT_NODE = True
     CATEGORY = "Image/Deployable"
@@ -41,6 +43,9 @@ class SaveImageEXR_Deployable:
 
         full_output_folder, filename, counter, subfolder, filename_prefix = folder_paths.get_save_image_path(filename_prefix, self.output_dir, images[0].shape[1], images[0].shape[0])
         results = list()
+        
+        # ADDED: Variable to store the path of the first saved file
+        first_file_path = ""
 
         for image in images:
             image_np = image.cpu().numpy()
@@ -51,6 +56,10 @@ class SaveImageEXR_Deployable:
             file = f"{filename}_{counter:05}.exr"
             file_path = os.path.join(full_output_folder, file)
             
+            # ADDED: Capture the path of the first image
+            if not first_file_path:
+                first_file_path = file_path
+
             image_np_bgr = cv2.cvtColor(image_np, cv2.COLOR_RGB2BGR)
             cv2.imwrite(file_path, image_np_bgr)
 
@@ -61,9 +70,10 @@ class SaveImageEXR_Deployable:
             })
             counter += 1
 
-        return {"ui": {"images": results}}
+        # MODIFIED: Return both the UI data and the direct file_path output
+        return {"ui": {"images": results}, "result": (first_file_path,)}
 
-# --- NEW NODE ADDED BELOW ---
+# --- EXPORT FLOAT NODE (UNCHANGED) ---
 
 class ExportFloat:
     @classmethod
@@ -86,7 +96,7 @@ class ExportFloat:
     RETURN_NAMES = ("value",)
     FUNCTION = "export_value"
 
-    CATEGORY = "Image/Deployable" # Placing it in the same category
+    CATEGORY = "Image/Deployable"
 
     def export_value(self, value, output_name):
         text_output = f"{output_name}: {value}"
@@ -98,15 +108,13 @@ class ExportFloat:
             "result": (value,)
         }
 
-# --- NODE REGISTRATION ADDED BELOW ---
+# --- NODE REGISTRATION (UNCHANGED) ---
 
-# This dictionary tells ComfyUI about the nodes in this file
 NODE_CLASS_MAPPINGS = {
     "SaveImageEXR_Deployable": SaveImageEXR_Deployable,
     "ExportFloat": ExportFloat
 }
 
-# This dictionary sets the display names of the nodes in the ComfyUI menu
 NODE_DISPLAY_NAME_MAPPINGS = {
     "SaveImageEXR_Deployable": "Save EXR (Deployable)",
     "ExportFloat": "Export Float"
